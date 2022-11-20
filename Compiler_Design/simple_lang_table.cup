@@ -1,0 +1,363 @@
+// JavaCup specification for  "simple lang"
+
+package com.habibi.compiler;
+
+import java_cup.runtime.*;
+import java.util.*;
+import com.habibi.util.*;
+
+parser code  {:
+ /* Change the method report_error so it will display the line and
+       column of where the error occurred in the input as well as the
+       reason for the error which is passed into the method in the
+       String 'message'. */
+    public void report_error(String message, Object info) {
+   
+        /* Create a StringBuffer called 'm' with the string 'Error' in it. */
+        StringBuffer m = new StringBuffer("Error");
+   
+        /* Check if the information passed to the method is the same
+           type as the type java_cup.runtime.Symbol. */
+        if (info instanceof java_cup.runtime.Symbol) {
+            /* Declare a java_cup.runtime.Symbol object 's' with the
+               information in the object info that is being typecasted
+               as a java_cup.runtime.Symbol object. */
+            java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+   
+            /* Check if the line number in the input is greater or
+               equal to zero. */
+            if (s.left >= 0) {                
+                /* Add to the end of the StringBuffer error message
+                   the line number of the error in the input. */
+                m.append(" in line "+(s.left));   
+                /* Check if the column number in the input is greater
+                   or equal to zero. */
+                if (s.right >= 0)                    
+                    /* Add to the end of the StringBuffer error message
+                       the column number of the error in the input. */
+                    m.append(", column "+(s.right));
+            }
+        }
+   
+        /* Add to the end of the StringBuffer error message created in
+           this method the message that was passed into this method. */
+        m.append(" : "+message);
+   
+        /* Print the contents of the StringBuffer 'm', which contains
+           an error message, out on a line. */
+        System.err.println(m);
+    }
+   
+    /* Change the method report_fatal_error so when it reports a fatal
+       error it will display the line and column number of where the
+       fatal error occurred in the input as well as the reason for the
+       fatal error which is passed into the method in the object
+       'message' and then exit.*/
+    public void report_fatal_error(String message, Object info) {
+        report_error(message, info);
+        System.exit(1);
+        //return null;
+    }
+
+//************************************************************************
+      private boolean addToTable= true ;
+      private Semantic semantic=new Semantic();
+      public Semantic getSemantic() {	return semantic; }
+      private Vector errors=new Vector();
+      protected Vector getErrors(){ return errors; }
+      protected void addError(String error){	this.errors.add(error);	}
+
+ :}; // useful for generating symbols table
+
+   
+
+/* Terminals tokens returned by the scanner. */
+terminal   main  ;
+terminal   printf , scanf ;
+terminal   GOTO ;
+terminal   INT, CHAR; // INTegral_type
+terminal   FLOAT; // FLOATing_poINT_type
+terminal   SEMICOLON, MULT, COMMA, LBRACE, RBRACE, EQ, LPAREN, RPAREN, COLON,NUMBERSIGN;
+terminal   IF, ELSE; // if_then_statement, if_then_else_statement
+terminal   WHILE; // while_statement
+terminal   FOR; // for_statement
+terminal   PREPLUSPLUS ,POSTPLUSPLUS; // increment_expression
+terminal   PREMINUSMINUS , POSTMINUSMINUS; // postdecrement_expression
+terminal   PLUS, MINUS, UNARYMINUS, NOT, DIV, MOD;
+terminal   LT, GT, LTEQ, GTEQ ; // relational_expression
+terminal   EQEQ, NOTEQ; // equality_expression
+terminal   AND; // and_expression
+terminal   OR;  // inclusive_or_expression
+terminal   MULTEQ, DIVEQ, MODEQ, PLUSEQ, MINUSEQ; // assignment_operator
+terminal   INTEGER_LITERAL;
+terminal   FLOATING_POINT_LITERAL;
+terminal   CHARACTER_LITERAL;
+terminal   IDENTIFIER; // name
+terminal   STRING_LITERAL;
+
+terminal   BODY ;
+terminal   DCL_PART ;
+terminal   INT_LIST, CHAR_LIST, FLOAT_LIST;
+terminal   EXECUTION_PART;
+terminal   LABELED_STAT;
+terminal   WHILE_STAT, FOR_STAT, GOTO_STAT, IF_STAT, IF_ELSE_STAT;
+terminal   PRINTF_STAT ,OUT_LIST;
+terminal   SCANF_STAT, IN_LIST;
+terminal   F_LIST, C_LIST, I_LIST;
+
+
+/* Non terminals */
+non terminal   NodeInterface   program , head , body , dcl_part , execution_part ;
+non terminal   NodeInterface   dcl_stat , dcl_int , dcl_char , dcl_float , int_list ;
+non terminal   NodeInterface   i_list , char_list , c_list , float_list , f_list ;
+non terminal   NodeInterface   stat , labeled_stat , unlabeled_stat , assign_stat ;
+non terminal   NodeInterface   while_stat , for_stat , goto_list , if_stat , print_stat ;
+non terminal   NodeInterface   scan_stat , math_exp , logic_exp , unary_exp , out_list ;
+non terminal   NodeInterface   in_list , rel_exp , t1 , rel_op1 , rel_op2 , element1 ;
+non terminal   NodeInterface   element2 , element3 , term , factor , element , num_const;
+non terminal   NodeInterface   name ;
+non terminal   NodeInterface   i_l ,c_l ,f_p_l ,s_l ;
+non terminal   NodeInterface   label;
+non terminal   NodeInterface   i_list_IDENTIFIER , c_list_IDENTIFIER , f_list_IDENTIFIER ; 
+/*non terminal      if_else_stat , matched_stat , unmatched_stat ;*/
+
+
+
+start with program ;
+
+/* The grammar */
+program    ::= head LBRACE body:e1 RBRACE  {: RESULT=e1;:} 
+           ; 
+head       ::= main LPAREN RPAREN SEMICOLON 
+           ;
+body       ::= dcl_part:e1   execution_part:e2 {:NodeInterface node=new Node(sym.BODY); node.addChild(e1);node.addChild(e2);RESULT=node;:}
+           ;
+dcl_part   ::= dcl_stat:e1  SEMICOLON  dcl_part:e2 {:NodeInterface node=new Node(sym.DCL_PART); node.addChild(e1); node.addChild(e2); RESULT=node;:}
+               | dcl_stat:e1  SEMICOLON {:RESULT=e1;:}
+           ;
+dcl_stat   ::= dcl_int:e1  {:RESULT=e1;:} | dcl_char:e1  {:RESULT=e1;:}   | dcl_float:e1  {:RESULT=e1;:}
+           ; 
+dcl_int    ::= INT int_list:e1  {:RESULT=e1;:}
+           ;
+int_list   ::= i_list:e1  COMMA int_list:e2  {:NodeInterface node=new Node(sym.INT_LIST); node.addChild(e1); node.addChild(e2); RESULT=node;:}
+               | i_list:e1  {:RESULT=e1;:}
+           ;
+i_list     ::= i_list_IDENTIFIER:e1   {:RESULT=e1;:}
+               | i_list_IDENTIFIER:e1 EQ i_l:e2
+                 {:NodeInterface node=new Node(sym.I_LIST); node.addChild(e1); node.addChild(e2); RESULT=node; :}
+               | MULT IDENTIFIER   
+           ;
+i_list_IDENTIFIER     ::= IDENTIFIER:e1  {:NodeInterface node=new Node(sym.IDENTIFIER); RESULT=node;
+                                          if (addToTable==false)
+				            if (getSemantic().isDefined(e1))
+		                 		addError("Error at line "+Scanner.getLineNumber()+" : Variable "+ e1.getValue()+" is already defined !!!");
+				            else
+			        	        //getSemantic().add(new Variable(name,type,size));
+                                                  getSemantic().add(new Variable((((JavaSymbol)e1).getValue()), Variable.INTEGER , -1));
+		                       :}          
+                      ;
+i_l        ::= INTEGER_LITERAL:e1 {:NodeInterface node=new Node(sym.INTEGER_LITERAL); RESULT=node;
+                                   if (addToTable==false)
+              			     if (!getSemantic().isDefined(e1))
+                                        getSemantic().add(new Variable((((JavaSybbol)e1).getValue()) , Variable.INTEGER , -1));
+		                  :}                               
+           ;
+dcl_char   ::= CHAR  char_list:e1  {:RESULT=e1;:}
+           ;
+char_list  ::= c_list:e1  COMMA char_list:e2  {:NodeInterface node=new Node(sym.CHAR_LIST); node.addChild(e1); node.addChild(e2); RESULT=node;:}
+               | c_list:e1 {:RESULT=e1;:} 
+           ;
+c_list     ::= c_list_IDENTIFIER:e1 {:RESULT=e1;:}
+               | c_list_IDENTIFIER:e1  EQ  c_l:e2 {:NodeInterface node=new Node(sym.C_LIST); node.addChild(e1); node.addChild(e2); RESULT=node;:}
+               | MULT IDENTIFIER
+           ;
+c_list_IDENTIFIER     ::= IDENTIFIER:e1 {:NodeInterface node=new Node(sym.IDENTIFIER); RESULT=node ;
+                                         if (addToTable==false)
+				              if (getSemantic().isDefined(e1))
+		                 	  	addError("Error at line "+Scanner.getLineNumber()+" : Variable "+ e1.getValue()+" is already defined !!!");
+				              else
+			        	        //getSemantic().add(new Variable(name,type,size));
+                                                  getSemantic().add(new Variable((((JavaSymbol)e1).getValue()) , Variable.CHARECTER , -1));
+		                       :}
+           ;
+c_l        ::= CHARACTER_LITERAL:e1 {:NodeInterface node=new Node(sym.CHARACTER_LITERAL); RESULT=node;
+                                  if (addToTable==false)
+              			     if (!getSemantic().isDefined(e1))
+                                        getSemantic().add(new Variable((((JavaSymbol)e1).getValue()) , Variable.CHARACTER , -1));
+		                  :}                               
+           ;
+dcl_float  ::= FLOAT  float_list:e1 {:RESULT=e1;:}
+           ;
+float_list ::= f_list:e1 COMMA float_list:e2  {:NodeInterface node=new Node(sym.FLOAT_LIST); node.addChild(e1); node.addChild(e2); RESULT=node;:}
+               | f_list:e1 {:RESULT=e1;:} 
+           ;
+f_list     ::= f_list_IDENTIFIER {:NodeInterface node=new Node(sym.IDENTIFIER); RESULT=node;:}
+               | name:e1  EQ f_p_l:e2  {:NodeInterface node=new Node(sym.F_LIST); node.addChild(e1); node.addChild(e2); RESULT=node;:}
+               | MULT IDENTIFIER 
+           ;
+f_list_IDENTIFIER      ::= IDENTIFIER:e1 {:NodeInterface node=new Node(sym.IDENTIFIER); RESULT=node;
+                                           if (addToTable==false)
+				              if (getSemantic().isDefined(e1))
+		                 	          addError("Error at line "+Scanner.getLineNumber()+" : Variable "+ e1.getValue()+" is already defined !!!");
+				              else
+			        	        //getSemantic().add(new Variable(name,type,size));
+                                                  getSemantic().add(new Variable((((JavaSymbol)e1).getValue()) , Variable.FLOAT , -1));
+		                       :} 
+                         ;
+f_p_l      ::= FLOATING_POINT_LITERAL {:NodeInterface node=new Node(sym.FLOATING_POINT_LITERAL);RESULT=node;
+                                        if (addToTable==false)
+              			           if (!getSemantic().isDefined(e1))
+                                             getSemantic().add(new Variable((((JavaSymbol)e1).getValue()) , Variable.FLOAT , -1));
+		                      :}
+           ;
+execution_part ::= stat:e1  SEMICOLON execution_part:e2 {:NodeInterface node=new Node(sym.EXECUTION_PART);node.addChild(e1);node.addChild(e2);:}
+                   | stat:e1  SEMICOLON {:RESULT=e1;:}
+               ;
+stat           ::= labeled_stat:e1 {:RESULT=e1;:}
+                   | unlabeled_stat:e2 {:RESULT=e2;:}
+               ;
+labeled_stat   ::= label:e1  COLON unlabeled_stat:e2 {:NodeInterface node=new Node(sym.LABELED_STAT);node.addChild(e1);node.addChild(e2);:} 
+               ;
+unlabeled_stat ::= assign_stat:e1 {:RESULT=e1;:}
+                   | while_stat:e1 {:RESULT=e1;:}
+                   | for_stat:e1 {:RESULT=e1;:}
+                   | goto_list:e1 {:RESULT=e1;:}
+                   | if_stat:e1 {:RESULT=e1;:}
+                   | print_stat:e1 {:RESULT=e1;:}
+                   | scan_stat:e1 {:RESULT=e1;:}
+               ;
+assign_stat    ::= name:e1 EQ math_exp:e2 {:NodeInterface node=new Node(sym.EQ );node.addChild(e1); node.addChild(e2);RESULT=node;:}
+                   | name:e1 PLUSEQ math_exp:e2 {:NodeInterface node=new Node(sym.PLUSEQ );node.addChild(e1); node.addChild(e2);RESULT=node;:}
+                   | name:e1 MINUSEQ math_exp:e2 {:NodeInterface node=new Node(sym.MINUSEQ );node.addChild(e1); node.addChild(e2);RESULT=node;:}
+                   | name:e1 MULTEQ math_exp:e2 {:NodeInterface node=new Node(sym.MULTEQ );node.addChild(e1); node.addChild(e2);RESULT=node;:}
+                   | name:e1 DIVEQ math_exp:e2 {:NodeInterface node=new Node(sym.DIVEQ );node.addChild(e1); node.addChild(e2);RESULT=node;:}
+                   | name:e1 MODEQ math_exp:e2 {:NodeInterface node=new Node(sym.MODEQ );node.addChild(e1); node.addChild(e2);RESULT=node;:}
+                   | name EQ NUMBERSIGN name 
+                   | name:e1 EQ s_l:e2 {:NodeInterface node=new Node(sym.EQ );node.addChild(e1); node.addChild(e2);RESULT=node;:}
+              ; 
+s_l           ::= STRING_LITERAL {:NodeInterface node=new Node(sym.STRING_LITERAL);RESULT=node;:}
+              ;
+while_stat     ::= WHILE LPAREN logic_exp:e1 RPAREN LBRACE execution_part:e2 RBRACE 
+                   {:NodeInterface node=new Node(sym.WHILE_STAT);node.addChild(e1); node.addChild(e2);RESULT=node;:}
+               ;
+for_stat       ::= FOR LPAREN assign_stat:e1 SEMICOLON logic_exp:e2 SEMICOLON unary_exp:e3 RPAREN LBRACE execution_part:e4 RBRACE                 
+                   {:NodeInterface node=new Node(sym.FOR_STAT);node.addChild(e1); node.addChild(e2);node.addChild(e3);node.addChild(e4);RESULT=node;:}
+                 
+                   | FOR LPAREN assign_stat:e1 SEMICOLON logic_exp:e2 SEMICOLON assign_stat:e3 RPAREN LBRACE execution_part:e4 RBRACE 
+                   {:NodeInterface node=new Node(sym.FOR_STAT);node.addChild(e1); node.addChild(e2);node.addChild(e3);node.addChild(e4);RESULT=node;:}
+               ;
+unary_exp      ::= PREPLUSPLUS name:e1 {:NodeInterface node=new Node(sym.PREPLUSPLUS);node.addChild(e1);:}
+                   | name:e1 POSTPLUSPLUS {:NodeInterface node=new Node(sym.POSTPLUSPLUS);node.addChild(e1);RESULT=node;:} 
+                   | PREMINUSMINUS name:e1 {:NodeInterface node=new Node(sym.PREMINUSMINUS);node.addChild(e1);RESULT=node;:}
+                   | name:e1 POSTMINUSMINUS {:NodeInterface node=new Node(sym.POSTMINUSMINUS);node.addChild(e1);RESULT=node;:}
+               ;
+goto_list      ::= GOTO label:e1 {:NodeInterface node=new Node(sym.GOTO_STAT);node.addChild(e1);RESULT=node;:}
+               ;
+label          ::= IDENTIFIER {:NodeInterface node=new Node(sym.IDENTIFIER);RESULT=node;:}
+               ;
+if_stat        ::= IF LPAREN logic_exp:e1 RPAREN LBRACE execution_part:e2 RBRACE
+                   {:NodeInterface node=new Node(sym.IF_STAT);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | IF LPAREN logic_exp:e1 RPAREN LBRACE execution_part:e2 RBRACE ELSE LBRACE execution_part:e3 RBRACE
+                   {:NodeInterface node=new Node(sym.IF_ELSE_STAT);node.addChild(e1);node.addChild(e2);node.addChild(e3);:}
+               ; 
+
+                   /* |  if_else_stat ; */
+/*if_else_stat   ::= matched_stat | unmatched_stat ;
+matched_stat   ::= IF LPAREN logic_exp RPAREN LBRACE matched_stat RBRACE ELSE LBRACE matched_stat RBRACE | stat ; 
+unmatched_stat ::= IF LPAREN logic_exp RPAREN LBRACE matched_stat RBRACE ELSE LBRACE unmatched_stat RBRACE | stat ; 
+*/
+
+print_stat     ::= printf LPAREN out_list:e1 RPAREN 
+                   {:NodeInterface node=new Node(sym.PRINTF_STAT);node.addChild(e1);RESULT=node;:}  
+               ;
+out_list       ::= name:e1 COMMA out_list:e2
+                   {:NodeInterface node=new Node(sym.OUT_LIST);node.addChild(e1);node.addChild(e2);RESULT=node;:}  
+                   | IDENTIFIER:e1 {:NodeInterface node=new Node(sym.IDENTIFIER);RESULT=node;:}  
+                   | MULT IDENTIFIER
+               ;
+scan_stat      ::= scanf LPAREN in_list:e1 RPAREN 
+                   {:NodeInterface node=new Node(sym.SCANF_STAT);node.addChild(e1);RESULT=node;:}  
+               ;
+in_list       ::= name:e1 COMMA in_list:e2
+                  {:NodeInterface node=new Node(sym.IN_LIST);node.addChild(e1);node.addChild(e2);RESULT=node;:}   
+                  | IDENTIFIER:e1 {:NodeInterface node=new Node(sym.IDENTIFIER);RESULT=node;:}  
+                  | MULT IDENTIFIER
+              ;
+name          ::= IDENTIFIER:e1 {:NodeInterface node=new Node(sym.IDENTIFIER);RESULT=node;
+                               if (addToTable==false)
+				   if (!getSemantic().isDefined(e1))
+                                       addError("Error at line "+Scanner.getLineNumber()+" : Variable "+ e1.getValue()+" is not defined !!!");
+			        :}	
+              ;
+
+rel_exp       ::= t1:e1 EQEQ t1:e2
+                   {:NodeInterface node=new Node(sym.EQEQ);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | t1:e1 NOTEQ t1:e2  
+                   {:NodeInterface node=new Node(sym.NOTEQ);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | t1:e1 {:RESULT=e1;:}
+               ;
+t1             ::= math_exp:e1  LT  math_exp:e2
+                   {:NodeInterface node=new Node(sym.LT);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | math_exp:e1  LTEQ  math_exp:e2
+                   {:NodeInterface node=new Node(sym.LTEQ);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | math_exp:e1  GT  math_exp:e2 
+                   {:NodeInterface node=new Node(sym.GT);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | math_exp:e1  GTEQ  math_exp:e2
+                   {:NodeInterface node=new Node(sym.GTEQ);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+               ;
+/*rel_op2        ::= LT {:NodeInterface node=new Node(sym.LT);RESULT=node;:}
+                   | LTEQ {:NodeInterface node=new Node(sym.LTEQ);RESULT=node;:}
+                   | GT {:NodeInterface node=new Node(sym.GT);RESULT=node;:}
+                   | GTEQ {:NodeInterface node=new Node(sym.GTEQ);RESULT=node;:}
+               ;
+*/
+/*rel_op1        ::= EQEQ {:NodeInterface node=new Node(sym.EQEQ);RESULT=node;:}
+                   | NOTEQ {:NodeInterface node=new Node(sym.NOTEQ);RESULT=node;:}
+               ;
+*/
+logic_exp      ::= logic_exp:e1 OR element1:e2
+                    {:NodeInterface node=new Node(sym.OR);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | element1:e1 {:RESULT=e1;:} 
+               ;
+element1      ::= element1:e1  AND element2:e2 
+                   {:NodeInterface node=new Node(sym.AND);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | element2:e1 {:RESULT=e1;:}
+               ; 
+element2       ::= NOT element2:e1  {:NodeInterface node=new Node(sym.NOT);node.addChild(e1);RESULT=node;:}
+                   | element3:e1 {:RESULT=e1;:}
+               ;
+element3       ::= LPAREN logic_exp:e1 RPAREN {:RESULT=e1;:}
+                   | rel_exp:e1 {:RESULT=e1;:}
+               ; 
+math_exp       ::= math_exp:e1 PLUS term:e2  {:NodeInterface node=new Node(sym.PLUS);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | math_exp:e1 MINUS term:e2 {:NodeInterface node=new Node(sym.MINUS);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | term:e1 {:RESULT=e1;:}
+               ;
+term           ::= term:e1 MULT factor:e2  {:NodeInterface node=new Node(sym.MULT);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | term:e1 DIV factor:e2  {:NodeInterface node=new Node(sym.DIV);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | term:e1 MOD factor:e2  {:NodeInterface node=new Node(sym.MOD);node.addChild(e1);node.addChild(e2);RESULT=node;:}
+                   | factor:e1 {:RESULT=e1;:}
+               ;
+factor         ::= UNARYMINUS factor:e1 
+                   {:NodeInterface node=new Node(sym.UNARYMINUS);node.addChild(e1);RESULT=node;:}
+                   | element:e1 {:RESULT=e1;:}
+               ;
+element        ::= LPAREN math_exp:e1 RPAREN {:RESULT=e1;:}
+                   | IDENTIFIER:e1 {:NodeInterface node=new Node(sym.IDENTIFIER);RESULT=node;:} 
+                   | num_const:e1 {:RESULT=e1;:} 
+                   | name:e1 POSTPLUSPLUS {:NodeInterface node=new Node(sym.POSTPLUSPLUS);node.addChild(e1);RESULT=node;:}
+                   | PREPLUSPLUS name:e1  {:NodeInterface node=new Node(sym.PREPLUSPLUS);node.addChild(e1);RESULT=node;:} 
+                   | name:e1  POSTMINUSMINUS  {:NodeInterface node=new Node(sym.POSTMINUSMINUS);node.addChild(e1);RESULT=node;:}
+                   | PREMINUSMINUS  name:e1   {:NodeInterface node=new Node(sym.PREMINUSMINUS);node.addChild(e1);RESULT=node;:}
+               ;
+num_const      ::= INTEGER_LITERAL:e1 {:NodeInterface node=new Node(sym.INTEGER_LITERAL); RESULT=node;
+                                        if (addToTable==false)
+              			           if (!getSemantic().isDefined(e1))
+                                             getSemantic().add(new Variable((((JavaSymbol)e1).getValue()) , Variable.INTEGER , -1));
+		                      :}
+                   | FLOATING_POINT_LITERAL:e1 {:NodeInterface node=new Node(sym.FLOATING_POINT_LITERAL); RESULT=node;
+                                               if (addToTable==false)
+              			                 if (!getSemantic().isDefined(e1))
+                                                  getSemantic().add(new Variable((((JavaSymbol)e1).getValue()), Variable.FLOAT , -1));
+		                               :} 
+               ;
