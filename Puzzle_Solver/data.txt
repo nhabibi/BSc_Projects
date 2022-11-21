@@ -1,0 +1,6 @@
+Jack lives in the blue house.
+Mary does not live in the red house.
+The mechanic lives in the red house.
+The architect does not live in the blue house.
+Who is the mechanic? What do you know about Jack?
+What do you know about Mary?Who lives in the blue house?
